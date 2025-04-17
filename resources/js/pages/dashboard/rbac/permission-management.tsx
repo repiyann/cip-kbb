@@ -9,22 +9,31 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { PaginatedData } from '@/types';
 import { PermissionForm, PermissionProps } from '@/types/rbac';
-import { useForm } from '@inertiajs/react';
-import { Edit, Key, LoaderCircle, MoreHorizontal, Plus, Trash } from 'lucide-react';
+import { router, useForm, usePage } from '@inertiajs/react';
+import { debounce } from 'lodash';
+import { Edit, Key, LoaderCircle, MoreHorizontal, Plus, Search, Trash } from 'lucide-react';
 import { useState } from 'react';
 
 interface PageProps {
-    permissions: PermissionProps[];
+    permissions: PaginatedData<PermissionProps>;
     [key: string]: unknown;
 }
 
 export default function PermissionManagement({ permissions }: PageProps) {
+    const { filters } = usePage<{
+        filters: { search?: string };
+    }>().props;
+
     const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
     const [isEditing, setIsEditing] = useState<boolean>(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
     const [currentPermission, setCurrentPermission] = useState<PermissionProps | null>(null);
     const [isCustomCategory, setIsCustomCategory] = useState<boolean>(false);
+    const [values, setValues] = useState({
+        search: filters.search || '',
+    });
 
     const categories = ['Admins', 'Users', 'Chats'];
 
@@ -73,21 +82,63 @@ export default function PermissionManagement({ permissions }: PageProps) {
         }
     }
 
+    const debouncedSearch = debounce((searchTerm: string, router) => {
+        const query = searchTerm ? { search: searchTerm } : {};
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentActiveTab = urlParams.get('activeTab') || 'users';
+
+        router.get(route('rbac.index', { activeTab: currentActiveTab, ...query }), {
+            replace: true,
+            preserveState: true,
+        });
+    }, 300);
+
+    function handleSearchInput(e: React.ChangeEvent<HTMLInputElement>) {
+        const newValue = e.target.value;
+
+        setValues((values) => ({
+            ...values,
+            search: newValue,
+        }));
+
+        debouncedSearch(newValue, router);
+    }
+
     function handleCreatePermission() {
         setIsEditing(false);
         setIsDialogOpen(true);
-        setData('name', '');
+
+        setData({
+            name: '',
+            category: '',
+            description: '',
+        });
     }
 
     function handleEditPermission(permission: typeof currentPermission) {
         setIsEditing(true);
-        setCurrentPermission(permission);
         setIsDialogOpen(true);
 
+        setCurrentPermission(permission);
         if (permission) {
-            setData('name', permission.name);
+            const isCustom = !categories.includes(permission.category);
+            setIsCustomCategory(isCustom);
+            setSelectedCategory(isCustom ? 'custom' : permission.category);
+            const actionName = permission.name.split('.').pop() || '';
+
+            setData({
+                name: actionName,
+                category: permission.category,
+                description: permission.description,
+            });
         } else {
-            setData('name', '');
+            setIsCustomCategory(false);
+            setSelectedCategory('');
+            setData({
+                name: '',
+                category: '',
+                description: '',
+            });
         }
     }
 
@@ -107,77 +158,86 @@ export default function PermissionManagement({ permissions }: PageProps) {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
+        <div className="relative space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
                 <h2 className="text-lg font-medium">Permissions</h2>
-                <Button onClick={handleCreatePermission} className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span>Add Permission</span>
-                </Button>
+
+                <div className="flex w-full gap-2 sm:w-auto">
+                    <div className="relative w-full sm:w-64">
+                        <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                        <Input placeholder="Search permissions..." value={values.search} onChange={handleSearchInput} className="pl-8" />
+                    </div>
+                    <Button onClick={handleCreatePermission} className="flex items-center gap-2 whitespace-nowrap">
+                        <Plus className="h-4 w-4" />
+                        <span>Add Permission</span>
+                    </Button>
+                </div>
             </div>
 
-            {permissions.length === 0 ? (
-                <Alert>
-                    <Key className="h-4 w-4" />
-                    <AlertTitle>No permissions defined</AlertTitle>
-                    <AlertDescription>Create your first permission to start building your access control system.</AlertDescription>
-                </Alert>
-            ) : (
-                <div className="rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead>Category</TableHead>
-                                <TableHead className="w-[100px] text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-
-                        <TableBody>
-                            {permissions.map((permission) => (
-                                <TableRow key={permission.id}>
-                                    <TableCell className="font-medium">{permission.name}</TableCell>
-                                    <TableCell>{permission.description}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className="capitalize">
-                                            {permission.category}
-                                        </Badge>
-                                    </TableCell>
-
-                                    <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0" aria-label="Open menu">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem
-                                                    onClick={() => handleEditPermission(permission)}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <Edit className="h-4 w-4" />
-                                                    <span>Edit</span>
-                                                </DropdownMenuItem>
-
-                                                <DropdownMenuItem
-                                                    onClick={() => handleDeletePermission(permission)}
-                                                    className="text-destructive flex items-center gap-2"
-                                                >
-                                                    <Trash className="h-4 w-4" />
-                                                    <span>Delete</span>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
+            <div className="relative">
+                {permissions.data.length === 0 ? (
+                    <Alert>
+                        <Key className="h-4 w-4" />
+                        <AlertTitle>No permissions defined</AlertTitle>
+                        <AlertDescription>Create your first permission to start building your access control system.</AlertDescription>
+                    </Alert>
+                ) : (
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead>Category</TableHead>
+                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
+                            </TableHeader>
+
+                            <TableBody>
+                                {permissions.data.map((permission) => (
+                                    <TableRow key={permission.id}>
+                                        <TableCell className="font-medium">{permission.name}</TableCell>
+                                        <TableCell>{permission.description}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className="capitalize">
+                                                {permission.category}
+                                            </Badge>
+                                        </TableCell>
+
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" aria-label="Open menu">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleEditPermission(permission)}
+                                                        className="flex items-center gap-2"
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                        <span>Edit</span>
+                                                    </DropdownMenuItem>
+
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleDeletePermission(permission)}
+                                                        className="text-destructive flex items-center gap-2"
+                                                    >
+                                                        <Trash className="h-4 w-4" />
+                                                        <span>Delete</span>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
 
             {/* Create/Edit Permission Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

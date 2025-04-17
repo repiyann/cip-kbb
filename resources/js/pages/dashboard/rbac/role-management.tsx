@@ -11,23 +11,32 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { PaginatedData } from '@/types';
 import { PermissionProps, RoleForm, RoleProps } from '@/types/rbac';
-import { useForm } from '@inertiajs/react';
-import { Check, Edit, Eye, LoaderCircle, MoreHorizontal, Plus, Shield, Trash } from 'lucide-react';
+import { router, useForm, usePage } from '@inertiajs/react';
+import { debounce } from 'lodash';
+import { Check, Edit, Eye, LoaderCircle, MoreHorizontal, Plus, Search, Shield, Trash } from 'lucide-react';
 import { useState } from 'react';
 
 interface PageProps {
-    roles: RoleProps[];
+    roles: PaginatedData<RoleProps>;
     permissions: PermissionProps[];
     [key: string]: unknown;
 }
 
 export default function RoleManagement({ roles, permissions }: PageProps) {
+    const { filters } = usePage<{
+        filters: { search?: string };
+    }>().props;
+
     const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
     const [isEditing, setIsEditing] = useState<boolean>(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState<boolean>(false);
     const [currentRole, setCurrentRole] = useState<RoleProps | null>(null);
+    const [values, setValues] = useState({
+        search: filters.search || '',
+    });
 
     const {
         data,
@@ -41,6 +50,7 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
     } = useForm<Required<RoleForm>>({
         name: '',
         description: '',
+        permissions: [],
     });
 
     function submit(e: React.FormEvent) {
@@ -49,24 +59,50 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
         if (isEditing && currentRole) {
             put(route('roles.update', { id: currentRole.id }), {
                 onFinish: function () {
-                    reset('name');
+                    reset();
                     setIsDialogOpen(false);
                 },
             });
         } else {
             post(route('roles.store'), {
                 onFinish: function () {
-                    reset('name');
+                    reset();
                     setIsDialogOpen(false);
                 },
             });
         }
     }
 
+    const debouncedSearch = debounce((searchTerm: string, router) => {
+        const query = searchTerm ? { search: searchTerm } : {};
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentActiveTab = urlParams.get('activeTab') || 'users';
+
+        router.get(route('rbac.index', { activeTab: currentActiveTab, ...query }), {
+            replace: true,
+            preserveState: true,
+        });
+    }, 300);
+
+    function handleSearchInput(e: React.ChangeEvent<HTMLInputElement>) {
+        const newValue = e.target.value;
+
+        setValues((values) => ({
+            ...values,
+            search: newValue,
+        }));
+
+        debouncedSearch(newValue, router);
+    }
+
     function handleCreateRole() {
         setIsEditing(false);
         setIsDialogOpen(true);
-        setData('name', '');
+        setData({
+            name: '',
+            description: '',
+            permissions: [],
+        });
     }
 
     function handleEditRole(role: typeof currentRole) {
@@ -75,9 +111,17 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
         setIsDialogOpen(true);
 
         if (role) {
-            setData('name', role.name);
+            setData({
+                name: role.name,
+                description: role.description,
+                permissions: role.permissions.map((p) => p.id),
+            });
         } else {
-            setData('name', '');
+            setData({
+                name: '',
+                description: '',
+                permissions: [],
+            });
         }
     }
 
@@ -102,14 +146,15 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
     }
 
     function togglePermission(permission: PermissionProps) {
-        if (!currentRole) return;
-
-        setCurrentRole({
-            ...currentRole,
-            permissions: currentRole.permissions.includes(permission)
-                ? currentRole.permissions.filter((p) => p.id !== permission.id)
-                : [...currentRole.permissions, permission],
-        });
+        const exists = data.permissions.includes(permission.id);
+        if (exists) {
+            setData(
+                'permissions',
+                data.permissions.filter((id) => id !== permission.id),
+            );
+        } else {
+            setData('permissions', [...data.permissions, permission.id]);
+        }
     }
 
     // Group permissions by category (based on naming convention)
@@ -126,96 +171,105 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
     );
 
     return (
-        <div className="space-y-6">
+        <div className="relative space-y-6">
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-medium">Roles</h2>
-                <Button onClick={handleCreateRole} className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span>Add Role</span>
-                </Button>
+
+                <div className="flex w-full gap-2 sm:w-auto">
+                    <div className="relative w-full sm:w-64">
+                        <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                        <Input placeholder="Search roles..." value={values.search} onChange={handleSearchInput} className="pl-8" />
+                    </div>
+                    <Button onClick={handleCreateRole} className="flex items-center gap-2 whitespace-nowrap">
+                        <Plus className="h-4 w-4" />
+                        <span>Add Role</span>
+                    </Button>
+                </div>
             </div>
 
-            {roles.length === 0 ? (
-                <Alert>
-                    <Shield className="h-4 w-4" />
-                    <AlertTitle>No roles defined</AlertTitle>
-                    <AlertDescription>Create your first role to start setting up access control.</AlertDescription>
-                </Alert>
-            ) : (
-                <div className="rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[200px]">Name</TableHead>
-                                <TableHead>Description</TableHead>
-                                <TableHead>Permissions</TableHead>
-                                <TableHead className="w-[100px] text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-
-                        <TableBody>
-                            {roles.map((role) => (
-                                <TableRow key={role.id}>
-                                    <TableCell className="font-medium">{role.name}</TableCell>
-                                    <TableCell>{role.description}</TableCell>
-
-                                    <TableCell>
-                                        <div className="flex flex-wrap gap-1">
-                                            {role.permissions.length > 3 ? (
-                                                <>
-                                                    <Badge variant="outline" className="rounded-sm">
-                                                        {role.permissions.length} permissions
-                                                    </Badge>
-                                                </>
-                                            ) : (
-                                                role.permissions.map((permission) => {
-                                                    const permObj = permissions.find((p: PermissionProps) => p.id === permission.id);
-
-                                                    return (
-                                                        <Badge key={permission.id} variant="outline" className="rounded-sm">
-                                                            {permObj?.name || permission.name}
-                                                        </Badge>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                    </TableCell>
-
-                                    <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0" aria-label="Open menu">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleViewRoleDetails(role)} className="flex items-center gap-2">
-                                                    <Eye className="h-4 w-4" />
-                                                    <span>View Details</span>
-                                                </DropdownMenuItem>
-
-                                                <DropdownMenuItem onClick={() => handleEditRole(role)} className="flex items-center gap-2">
-                                                    <Edit className="h-4 w-4" />
-                                                    <span>Edit</span>
-                                                </DropdownMenuItem>
-
-                                                <DropdownMenuItem
-                                                    onClick={() => handleDeleteRole(role)}
-                                                    className="text-destructive flex items-center gap-2"
-                                                >
-                                                    <Trash className="h-4 w-4" />
-                                                    <span>Delete</span>
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
+            <div className="relative">
+                {roles.data.length === 0 ? (
+                    <Alert>
+                        <Shield className="h-4 w-4" />
+                        <AlertTitle>No roles defined</AlertTitle>
+                        <AlertDescription>Create your first role to start setting up access control.</AlertDescription>
+                    </Alert>
+                ) : (
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[200px]">Name</TableHead>
+                                    <TableHead>Description</TableHead>
+                                    <TableHead>Permissions</TableHead>
+                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
+                            </TableHeader>
+
+                            <TableBody>
+                                {roles.data.map((role) => (
+                                    <TableRow key={role.id}>
+                                        <TableCell className="font-medium">{role.name}</TableCell>
+                                        <TableCell>{role.description}</TableCell>
+
+                                        <TableCell>
+                                            <div className="flex flex-wrap gap-1">
+                                                {role.permissions.length > 3 ? (
+                                                    <>
+                                                        <Badge variant="outline" className="rounded-sm">
+                                                            {role.permissions.length} permissions
+                                                        </Badge>
+                                                    </>
+                                                ) : (
+                                                    role.permissions.map((permission) => {
+                                                        const permObj = permissions.find((p: PermissionProps) => p.id === permission.id);
+
+                                                        return (
+                                                            <Badge key={permission.id} variant="outline" className="rounded-sm">
+                                                                {permObj?.name || permission.name}
+                                                            </Badge>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </TableCell>
+
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0" aria-label="Open menu">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleViewRoleDetails(role)} className="flex items-center gap-2">
+                                                        <Eye className="h-4 w-4" />
+                                                        <span>View Details</span>
+                                                    </DropdownMenuItem>
+
+                                                    <DropdownMenuItem onClick={() => handleEditRole(role)} className="flex items-center gap-2">
+                                                        <Edit className="h-4 w-4" />
+                                                        <span>Edit</span>
+                                                    </DropdownMenuItem>
+
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleDeleteRole(role)}
+                                                        className="text-destructive flex items-center gap-2"
+                                                    >
+                                                        <Trash className="h-4 w-4" />
+                                                        <span>Delete</span>
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
 
             {/* Create/Edit Role Dialog */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -251,7 +305,7 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
                                     <Textarea
                                         id="description"
                                         value={data.description}
-                                        onChange={(e) => setCurrentRole(currentRole ? { ...currentRole, description: e.target.value } : null)}
+                                        onChange={(e) => setData('description', e.target.value)}
                                         placeholder="Describe what this role is for"
                                     />
 
@@ -276,7 +330,7 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
                                                             <div key={permission.id} className="flex items-start space-x-2">
                                                                 <Checkbox
                                                                     id={`permission-${permission.id}`}
-                                                                    checked={currentRole?.permissions.some((p) => p.id === permission.id) || false}
+                                                                    checked={data.permissions.includes(permission.id)}
                                                                     onCheckedChange={() => togglePermission(permission)}
                                                                 />
 
@@ -348,7 +402,19 @@ export default function RoleManagement({ roles, permissions }: PageProps) {
                         ) : (
                             <ScrollArea className="h-[400px] rounded-md border">
                                 <div className="space-y-6 p-4">
-                                    {Object.entries(groupedPermissions).map(([category, permissions]) => (
+                                    {Object.entries(
+                                        currentRole.permissions.reduce(
+                                            (groupedPermissions, permission) => {
+                                                const category = permission.category.split('.')[0];
+                                                if (!groupedPermissions[category]) {
+                                                    groupedPermissions[category] = [];
+                                                }
+                                                groupedPermissions[category].push(permission);
+                                                return groupedPermissions;
+                                            },
+                                            {} as Record<string, typeof permissions>,
+                                        ),
+                                    ).map(([category, permissions]) => (
                                         <Card key={category}>
                                             <CardHeader className="py-3">
                                                 <CardTitle className="text-base capitalize">{category}</CardTitle>
