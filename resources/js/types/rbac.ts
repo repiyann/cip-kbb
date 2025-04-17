@@ -21,4 +21,5 @@ export interface PermissionForm {
 export interface RoleForm {
     name: string;
     description: string;
+    permissions: number[];
 }
