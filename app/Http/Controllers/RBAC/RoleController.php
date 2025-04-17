@@ -4,30 +4,22 @@ namespace App\Http\Controllers\RBAC;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 use Illuminate\Http\RedirectResponse;
-use Inertia\Response;
-use Spatie\Permission\Models\Permission;
 
 class RoleController extends Controller
 {
-  public function create(): Response
-  {
-    $permissions = Permission::orderBy('name', 'ASC')->get();
-
-    return Inertia::render('dashboard/rbac/role-management', [
-      'permissions' => $permissions,
-    ]);
-  }
-
   public function store(Request $request): RedirectResponse
   {
     $request->validate([
-      'name' => 'required|unique:roles|min:3'
+      'name' => 'required|unique:roles|min:3',
+      'description' => 'required|min:3'
     ]);
 
-    $role = Role::create(['name' => $request->name]);
+    $role = Role::create([
+      'name' => $request->name,
+      'description' => $request->description
+    ]);
 
     foreach ($request->permissions as $permission) {
       $role->givePermissionTo($permission);
@@ -36,33 +28,31 @@ class RoleController extends Controller
     return redirect()->back()->with('success', 'Role created successfully');
   }
 
-  public function show(Request $request): Response
-  {
-    $role = Role::findById($request->id);
-
-    return Inertia::render('dashboard/rbac/role-management', [
-      'role' => $role,
-    ]);
-  }
-
   public function update(Request $request): RedirectResponse
   {
-    $role = Role::findById($request->id);
+    $role = Role::findOrFail($request->id);
 
     $request->validate([
-      'name' => 'required|unique:roles|min:3'
+      'name' => 'required|min:3|unique:roles,name,' . $request->id . ',id',
+      'description' => 'required|min:3'
     ]);
 
     $role->name = $request->name;
+    $role->description = $request->description;
     $role->save();
+
+    if (!empty($request->permissions)) {
+      $role->syncPermissions($request->permissions);
+    } else {
+      $role->syncPermissions([]);
+    }
 
     return redirect()->back()->with('success', 'Role updated successfully');
   }
 
   public function destroy(Request $request): RedirectResponse
   {
-    $role = Role::findById($request->id);
-    $role->delete();
+    Role::where('id', $request->id)->delete();
 
     return redirect()->back()->with('success', 'Role deleted successfully');
   }
