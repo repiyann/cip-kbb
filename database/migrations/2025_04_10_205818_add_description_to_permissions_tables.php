@@ -19,13 +19,4 @@ return new class extends Migration
             $table->string('description')->nullable()->after('guard_name');
         });
     }
-
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
-    {
-        Schema::drop('roles');
-        Schema::drop('permissions');
-    }
 };
