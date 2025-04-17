@@ -3,27 +3,49 @@
 namespace App\Http\Controllers\RBAC;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Inertia\Response;
 use Inertia\Inertia;
-use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
+use App\Models\Permission;
+use App\Models\Role;
 
 class RbacController extends Controller
 {
-  public function index(): Response
+  public function index(Request $request): Response
   {
-    // $permissionsP = Permission::orderBy('created_at', 'DESC')->paginate();
-    $permissions = Permission::all();
+    $activeTab = $request->input('activeTab', 'permissions');
+    $filters = $request->only('search');
 
-    // $rolesP = Role::orderBy('created_at', 'DESC')->paginate();
-    // $roles = Role::all();
-    $roles = Role::orderBy('name', 'ASC')->with('permissions')->get();
+    $props = [
+      'activeTab' => $activeTab,
+      'filters' => $filters,
+      'roles' => [],
+      'permissions' => [],
+      'users' => [],
+    ];
 
-    return Inertia::render('dashboard/rbac/rbac-dashboard', [
-      'permissions' => $permissions,
-      // 'permissionsP' => $permissionsP,
-      'roles' => $roles,
-      // 'rolesP' => $rolesP,
-    ]);
+    if ($activeTab === 'roles') {
+      $props['roles'] = Role::with('permissions')
+        ->orderBy('name', 'ASC')
+        ->filter($filters)
+        ->paginate(10)
+        ->appends($request->all());
+      $props['permissions'] = Permission::orderBy('name', 'ASC')->get();
+    } elseif ($activeTab === 'users') {
+      $props['roles'] = Role::orderBy('name', 'ASC')->get();
+      $props['users'] = User::with('roles')
+        ->orderBy('created_at', 'DESC')
+        ->filter($filters)
+        ->paginate(10)
+        ->appends($request->all());
+    } else {
+      $props['permissions'] = Permission::orderBy('name', 'ASC')
+        ->filter($filters)
+        ->paginate(10)
+        ->appends($request->all());
+    }
+
+    return Inertia::render('dashboard/rbac/rbac-dashboard', $props);
   }
 }
