@@ -1,39 +1,71 @@
+import LoadingSpinner from '@/components/loading-spinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
+import { PaginatedData, User } from '@/types';
 import { PermissionProps, RoleProps } from '@/types/rbac';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { pickBy } from 'lodash';
 import { Key, Shield, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PermissionManagement from './permission-management';
 import RoleManagement from './role-management';
 import UserRoleAssignment from './user-role-assignment';
 
 interface PageProps {
-    roles: RoleProps[];
-    permissions: PermissionProps[];
+    activeTab: string;
+    roles: PaginatedData<RoleProps> | RoleProps[];
+    permissions: PaginatedData<PermissionProps> | PermissionProps[];
+    users: PaginatedData<User>;
     [key: string]: unknown;
 }
 
 export default function RbacDashboard() {
-    const { roles, permissions } = usePage<PageProps>().props;
-    const [activeTab, setActiveTab] = useState<string>('permissions');
-    
-    const breadcrumbs: BreadcrumbItem[] = [
-        {
-            title: 'Dashboard',
-            href: '/dashboard',
-        },
-        {
-            title: 'RBAC Management',
-            href: '/permissions',
-        },
-    ];
+    const { activeTab: initialActiveTab, roles, permissions, users } = usePage<PageProps>().props;
+
+    const [activeTab, setActiveTab] = useState<string>(initialActiveTab || 'permissions');
+    const [loading, setLoading] = useState<boolean>(false);
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentActiveTab = urlParams.get('activeTab') || 'permissions';
+        setActiveTab(currentActiveTab);
+    }, []);
+
+    function urlParamsToObject(urlParams: URLSearchParams): Record<string, string> {
+        const obj: Record<string, string> = {};
+        urlParams.forEach((value, key) => {
+            obj[key] = value;
+        });
+        return obj;
+    }
+
+    function handleTabChange(tab: string) {
+        setActiveTab(tab);
+
+        const values = { activeTab: tab };
+        const query = Object.keys(pickBy(values)).length ? pickBy(values) : new URLSearchParams(window.location.search);
+        const queryObject = query instanceof URLSearchParams ? urlParamsToObject(query) : query;
+
+        const routeName = route().current() ?? 'rbac.index';
+
+        router.get(route(routeName), queryObject, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+            onStart: () => {
+                setLoading(true);
+            },
+            onFinish: () => {
+                setLoading(false);
+            },
+        });
+    }
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Chatbot" />
+        <AppLayout>
+            <Head title="RBAC" />
+
             <main className="container mx-auto px-4 py-6 md:px-6">
                 <div className="space-y-6">
                     <div className="space-y-2">
@@ -41,7 +73,7 @@ export default function RbacDashboard() {
                         <p className="text-muted-foreground">Manage roles, permissions, and user assignments in your application.</p>
                     </div>
 
-                    <Tabs defaultValue="permissions" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                    <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
                         <TabsList className="grid h-auto max-w-2xl grid-cols-3 gap-4 md:inline-grid md:w-auto md:grid-cols-3">
                             <TabsTrigger value="permissions" className="data-[state=active]:border-primary flex items-center gap-2">
                                 <Key className="h-4 w-4" />
@@ -67,7 +99,11 @@ export default function RbacDashboard() {
                                 </CardHeader>
 
                                 <CardContent>
-                                    <PermissionManagement permissions={permissions} />
+                                    {loading ? (
+                                        <LoadingSpinner />
+                                    ) : (
+                                        <PermissionManagement permissions={permissions as PaginatedData<PermissionProps>} />
+                                    )}
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -80,7 +116,11 @@ export default function RbacDashboard() {
                                 </CardHeader>
 
                                 <CardContent>
-                                    <RoleManagement roles={roles} permissions={permissions} />
+                                    {loading ? (
+                                        <LoadingSpinner />
+                                    ) : (
+                                        <RoleManagement roles={roles as PaginatedData<RoleProps>} permissions={permissions as PermissionProps[]} />
+                                    )}
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -93,7 +133,7 @@ export default function RbacDashboard() {
                                 </CardHeader>
 
                                 <CardContent>
-                                    <UserRoleAssignment />
+                                    {loading ? <LoadingSpinner /> : <UserRoleAssignment users={users} roles={roles as RoleProps[]} />}
                                 </CardContent>
                             </Card>
                         </TabsContent>
