@@ -9,8 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PaginatedData, User } from '@/types';
 import { RoleProps } from '@/types/rbac';
+import { debouncedSearch } from '@/utils/rbac-utils';
 import { router, usePage } from '@inertiajs/react';
-import { debounce } from 'lodash';
 import { MoreHorizontal, Search, UserCog, Users } from 'lucide-react';
 import { useState } from 'react';
 
@@ -32,17 +32,6 @@ export default function UserRoleAssignment({ users, roles }: PageProps) {
     });
 
     const selectedRoleIds = selectedUser?.roles.map((role) => role.id) || [];
-
-    const debouncedSearch = debounce((searchTerm: string, router) => {
-        const query = searchTerm ? { search: searchTerm } : {};
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentActiveTab = urlParams.get('activeTab') || 'users';
-
-        router.get(route('rbac.index', { activeTab: currentActiveTab, ...query }), {
-            replace: true,
-            preserveState: true,
-        });
-    }, 300);
 
     function handleSearchInput(e: React.ChangeEvent<HTMLInputElement>) {
         const newValue = e.target.value;

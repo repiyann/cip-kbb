@@ -1,4 +1,4 @@
-import InputError from '@/components/input-error';
+import InputError from '@/components/atoms/input-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { PaginatedData } from '@/types';
 import { PermissionForm, PermissionProps } from '@/types/rbac';
+import { debouncedSearch } from '@/utils/rbac-utils'
 import { router, useForm, usePage } from '@inertiajs/react';
-import { debounce } from 'lodash';
 import { Edit, Key, LoaderCircle, MoreHorizontal, Plus, Search, Trash } from 'lucide-react';
 import { useState } from 'react';
 
@@ -35,7 +35,7 @@ export default function PermissionManagement({ permissions }: PageProps) {
         search: filters.search || '',
     });
 
-    const categories = ['Admins', 'Users', 'Chats'];
+    const categories = ['Admins', 'Users', 'Chatbot'];
 
     const {
         data,
@@ -46,7 +46,6 @@ export default function PermissionManagement({ permissions }: PageProps) {
         reset,
         put,
         delete: destroy,
-        transform,
     } = useForm<Required<PermissionForm>>({
         name: '',
         category: '',
@@ -57,13 +56,6 @@ export default function PermissionManagement({ permissions }: PageProps) {
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-
-        const categoryValue = isCustomCategory ? data.category : selectedCategory;
-        const permissionName = `${categoryValue.toLowerCase()}.${data.name}`;
-        transform((data) => ({
-            ...data,
-            name: permissionName,
-        }));
 
         if (isEditing && currentPermission) {
             put(route('permissions.update', { id: currentPermission.id }), {
@@ -81,17 +73,6 @@ export default function PermissionManagement({ permissions }: PageProps) {
             });
         }
     }
-
-    const debouncedSearch = debounce((searchTerm: string, router) => {
-        const query = searchTerm ? { search: searchTerm } : {};
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentActiveTab = urlParams.get('activeTab') || 'users';
-
-        router.get(route('rbac.index', { activeTab: currentActiveTab, ...query }), {
-            replace: true,
-            preserveState: true,
-        });
-    }, 300);
 
     function handleSearchInput(e: React.ChangeEvent<HTMLInputElement>) {
         const newValue = e.target.value;

@@ -1,4 +1,4 @@
-import LoadingSpinner from '@/components/loading-spinner';
+import LoadingSpinner from '@/components/atoms/loading-spinner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
