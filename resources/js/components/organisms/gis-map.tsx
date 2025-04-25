@@ -3,6 +3,8 @@ import type { Color, PickingInfo, Position } from '@deck.gl/core';
 import { AmbientLight, LightingEffect, MapViewState, _SunLight as SunLight } from '@deck.gl/core';
 import { GeoJsonLayer, PolygonLayer } from '@deck.gl/layers';
 import { DeckGL } from '@deck.gl/react';
+import { CompassWidget, ZoomWidget } from '@deck.gl/widgets';
+import '@deck.gl/widgets/stylesheet.css';
 import { scaleThreshold } from 'd3-scale';
 import { Feature, Geometry } from 'geojson';
 import { useCallback, useState } from 'react';
@@ -76,7 +78,7 @@ export default function GISMap({ data }: { data: Feature<Geometry, BlockProperti
         return (
             object && {
                 html: `\
-    <div><b>Average Property Value</b></div>
+    <div><b>Data Kabupaten Bandung</b></div>
     <div>Nama Kecamatan: ${object.properties.district}</div>
     <div>Nama Desa: ${object.properties.village}</div>
     <div><b>Growth</b></div>
@@ -109,9 +111,12 @@ export default function GISMap({ data }: { data: Feature<Geometry, BlockProperti
             pickable: true,
         }),
     ];
+
+    const widgets = [new ZoomWidget({ id: 'zoom' }), new CompassWidget({ id: 'compass' })];
+
     return (
-        <DeckGL layers={layers} effects={effects} initialViewState={INITIAL_VIEW_STATE} controller={true} getTooltip={getTooltip}>
-            <Map reuseMaps mapStyle={mapStyle} />
+        <DeckGL layers={layers} effects={effects} initialViewState={INITIAL_VIEW_STATE} widgets={widgets} controller={true} getTooltip={getTooltip}>
+            <Map reuseMaps mapStyle={mapStyle} attributionControl={false} />
         </DeckGL>
     );
 }
