@@ -1,4 +1,4 @@
-# Chat Interaction Platform - Kabupaten Bandung Barat
+# Chat Interaction Platform - Kabupaten Bandung
 
 ## Description
 
@@ -12,6 +12,7 @@ This is a foundational setup for a chat interaction platform, specifically focus
 - [Laravel](https://laravel.com/)
 - [Inertia](https://inertiajs.com/)
 - [ReactJS](https://vite.dev/)
+- [deck.gl](https://deck.gl/)
 
 # Getting Started
 
@@ -36,6 +37,16 @@ You could go to [Composer](https://getcomposer.org/) and [npm](https://www.npmjs
 
 1. Run Laravel `composer run dev`
 2. Open http://localhost:8000 with your browser to see the result.
+
+# TODO
+
+Current progress and upcoming features:
+- [x] Role-Based Access Control (RBAC) implementation
+- [x] Dark mode implementation
+- [x] GIS implementation using deck.gl
+- [ ] Chatbot integration
+- [ ] User interface improvements
+- [ ] Additional GIS features and layers
 
 # Author
 
