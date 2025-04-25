@@ -13,7 +13,6 @@ export default function ChatInput({ onSendMessage, isTyping }: ChatInputProps) {
     const [inputValue, setInputValue] = useState('');
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef<SpeechRecognition | null>(null);
-    // const [isSendingVoiceMessage, setIsSendingVoiceMessage] = useState(false);
     const messageProcessedRef = useRef(false);
 
     // Reset the message processed ref when input value changes
@@ -49,7 +48,6 @@ export default function ChatInput({ onSendMessage, isTyping }: ChatInputProps) {
         try {
             // Reset flag when starting a new listening session
             messageProcessedRef.current = false;
-            // setIsSendingVoiceMessage(false);
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognitionRef.current = new SpeechRecognition();
