@@ -12,6 +12,7 @@ class Role extends SpatieRole
         'guard_name',
     ];
 
+    // query scope for searching
     public function scopeFilter($query, array $filters)
     {
         $query->when($filters['search'] ?? null, function ($query, $search) {

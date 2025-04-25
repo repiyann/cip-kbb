@@ -21,6 +21,7 @@ class RoleController extends Controller
       'description' => $request->description
     ]);
 
+    // Add permissions to role
     foreach ($request->permissions as $permission) {
       $role->givePermissionTo($permission);
     }
@@ -41,6 +42,7 @@ class RoleController extends Controller
     $role->description = $request->description;
     $role->save();
 
+    // Update permissions to role
     if (!empty($request->permissions)) {
       $role->syncPermissions($request->permissions);
     } else {

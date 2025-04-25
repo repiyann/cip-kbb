@@ -13,6 +13,7 @@ class Permission extends SpatiePermission
         'guard_name',
     ];
 
+    // query scope for searching
     public function scopeFilter($query, array $filters)
     {
         $query->when($filters['search'] ?? null, function ($query, $search) {
