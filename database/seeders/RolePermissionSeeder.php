@@ -21,24 +21,43 @@ class RolePermissionSeeder extends Seeder
       'description' => 'Regular user role with limited access',
     ]);
 
-    $permissions = [
+    $chatbotPermissions = [
       'view' => 'Allows viewing of chatbot conversation logs',
       'reset' => 'Allows resetting the chatbot state',
       'train' => 'Allows training the chatbot with new data',
       'interact' => 'Allows interacting with the chatbot interface',
     ];
 
-    foreach ($permissions as $name => $description) {
+    $rbacPermissions = [
+      'manage-roles' => 'Allows managing roles',
+      'manage-permissions' => 'Allows managing permissions',
+      'view-roles' => 'Allows viewing roles',
+      'view-permissions' => 'Allows viewing permissions',
+    ];
+
+    foreach ($chatbotPermissions as $name => $description) {
       $permission = Permission::create([
         'name' => $name,
         'description' => $description,
-        'category' => 'Chats',
+        'category' => 'chatbot',
         'guard_name' => 'web',
       ]);
-
+      // Give 'admin' the permission
       $admin->givePermissionTo($permission);
     }
 
-    $user->givePermissionTo(['interact']);
+    // Create and assign permissions for the 'rbac' category
+    foreach ($rbacPermissions as $name => $description) {
+      $permission = Permission::create([
+        'name' => $name,
+        'description' => $description,
+        'category' => 'rbac',
+        'guard_name' => 'web',
+      ]);
+      // Give 'admin' the permission
+      $admin->givePermissionTo($permission);
+    }
+
+    $user->givePermissionTo('interact');
   }
 }
