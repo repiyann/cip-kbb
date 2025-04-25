@@ -4,12 +4,13 @@ use App\Http\Controllers\RBAC\PermissionController;
 use App\Http\Controllers\RBAC\RbacController;
 use App\Http\Controllers\RBAC\RoleController;
 use App\Http\Controllers\RBAC\UserRoleController;
+use App\Http\Middleware\RolePermissionMiddleware;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
-})->name('home');
+})->name('home')->middleware('guest');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
@@ -18,9 +19,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('chatbot', function () {
         return Inertia::render('dashboard/chatbot');
-    })->name('chatbot');
+    })->name('chatbot')->middleware(RolePermissionMiddleware::class);
 
-    Route::prefix('dashboard/rbac')->group(function () {
+    Route::prefix('dashboard/rbac')->middleware(RolePermissionMiddleware::class)->group(function () {
         Route::get('/', [RbacController::class, 'index'])->name('rbac.index');
 
         Route::post('permissions', [PermissionController::class, 'store'])->name('permissions.store');
